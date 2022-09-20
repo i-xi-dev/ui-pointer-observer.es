@@ -58,7 +58,13 @@ type PointerObserverEntry = {
 type PointerObserverCallback = (entries: Array<PointerObserverEntry>) => void;
 
 type PointerObserverOptions = {
-  pointermove?: boolean,
+  pointermove?: boolean,//TODO booleanでなく、
+  // 1:pointermoveが発火するたびにcallback実行
+  // 2:まびく
+  // 3:座標の記録だけして次にpointermove以外が起きた時にcallbackにわたす？とか historyの設定か？
+  // 4:完全無視
+  // にする
+
   // nonPrimary?: boolean, //XXX 途中で変わるならあまり意味ない
   untrusted?: boolean,
 };
