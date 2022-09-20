@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      *:root {
+        font-size: 12px;
+        user-select: none;
+      }
+      *:is(*#a1, *#a2, *#a3) > * {
+        pointer-events: none;
+        border: 1px solid #000;
+        position: absolute;
+        white-space: nowrap;
+      }
+      *:is(*#a1, *#a2, *#a3) > *[data-pstatus="active"] {
+        background: rgba(255, 106, 0, 0.5);
+        opacity: 1;
+      }
+      *:is(*#a1, *#a2, *#a3) > *[data-pstatus="inactive"] {
+        background: rgba(191, 255, 0, 0.5);
+        opacity: 1;
+      }
+      *:is(*#a1, *#a2, *#a3) > *[data-pstatus="disabled"] {
+        background: rgba(138, 138, 138, 0.5);
+        opacity: 0.6;
+      }
+      *:is(*#a1, *#a2, *#a3) > *[data-pprimary="true"] {
+        border: 2px solid red;
+      }
+      *.pId::before {
+        content: "-";
+      }
+    </style>
+    <script type="module">
+import { PointerObserver } from "../dist/index.js";
+
+const po = new PointerObserver((rs) => {
+  for (const r of rs) {
+    console.log(JSON.stringify(r))
+    const t = r.target;
+    for (const pd of r.pointerDataList) {
+      const tiid = `${t.id}-${pd.pointerType}-${pd.pointerId}`;
+      //console.log(`${tiid} ${pd.offsetX}, ${pd.offsetY}`);
+      let ti = t.querySelector("*#" + tiid);
+      if (ti) {
+        //
+      }
+      else {
+        ti = document.getElementById("p").content.firstElementChild.cloneNode(true);
+        ti.id = tiid;
+        ti.querySelector("*.pType").textContent = pd.pointerType;
+        ti.querySelector("*.pId").textContent = pd.pointerId;
+        t.appendChild(ti);
+      }
+      ti.querySelector("*.pPri").textContent = pd.primary;
+      ti.querySelector("*.pSt").textContent = pd.status;
+      ti.dataset.pstatus = pd.status;
+      ti.dataset.pprimary = pd.primary ? "true" : "false";
+      ti.style.setProperty("left", `${pd.offsetX}px`);
+      ti.style.setProperty("top", `${pd.offsetY}px`);
+
+      if (ti) {
+        //
+      }
+      else {
+        t.appendChild(ti);
+      }
+    }
+  }
+});
+po.observe(document.getElementById("a1"));
+po.observe(document.getElementById("a2"));
+po.observe(document.getElementById("a3"), {pointermove:true});
+console.log(po);
+    </script>
+  </head>
+  <body>
+    <template id="p">
+      <div>
+        <div>
+          <span class="pType"></span>
+          <span class="pId"></span>
+        </div>
+        <div>
+          <div class="pPri"></div>
+          <div class="pSt"></div>
+        </div>
+      </div>
+    </template>
+    <div style="position: relative; width: 4000px; height: 4000px;">
+      <div id="a1" style="left: 600px; top: 100px; position: absolute; width: 200px; height: 200px; background: #f008;"></div>
+      <div id="a2" style="left: 100px; top: 600px; position: absolute; width: 200px; height: 200px; background: #f008;"></div>
+      <div id="a3" style="left: 200px; top: 500px; position: absolute; width: 200px; height: 200px; background: #f008;"></div>
+    </div>
+    - どうやらprimaryは不変（firefox,chrome）
+    - Firefoxは意図したとおりの挙動
+    - Chromeがいろいろおかしい
+      - touchのpointerleaveの座標はあてにならない
+      - penのpointerenter,pointerleaveの直後に同じ位置でmouseの同じイベントが発火する
+    - Safariで確認したい
+
+
+    TODO
+    - importは含めないようにしたい
+    - ブラウザから直importの場合用のimportmapを含める
+  </body>
+</html>
