@@ -4,25 +4,32 @@ import { UiUtils } from "@i-xi-dev/ui-utils";
 type _PointerId = number;
 
 const PointerStatus = {
-  ACTIVE: "active",
-  INACTIVE: "inactive",
-  DISABLED: "disabled",
+  ACTIVE: "-active",//TODO active pointerを意味しないので紛らわしい
+  INACTIVE: "-inactive",
+  DISABLED: "-disabled",
 } as const;
 type PointerStatus = typeof PointerStatus[keyof typeof PointerStatus];
 
-type _PointerData = {
-  pointerType: UiUtils.PointerType,
-  pointerId: _PointerId,
-  primary: boolean,
-  status: PointerStatus,
-  offsetX: number,
-  offsetY: number,
-  pageX: number,
-  pageY: number,
+type PointerEventRecord = {
+  readonly timeStamp: number,
+  readonly eventType: string,
+  readonly offsetX: number,
+  readonly offsetY: number,
+  readonly pageX: number,
+  readonly pageY: number,
+};
 
-  history: Array<[number, string]>;
+type PointerData = {
+  readonly pointerId: _PointerId,
+  readonly pointerType: UiUtils.PointerType,
+  readonly isPrimary: boolean,
+  motion: Array<PointerEventRecord>,
+  status: PointerStatus,
+
+  //TODO  getCoalescedEvents(),
 
   /* TODO
+  buttons,
   altKey,
   ctrlKey,
   currentTarget,
@@ -36,7 +43,6 @@ type _PointerData = {
   /* XXX
   composed,
   composedPath(),
-  getCoalescedEvents(),
   getPredictedEvents(),
   height,
   pressure,
@@ -48,11 +54,9 @@ type _PointerData = {
   */
 };
 
-type _PointerDataMap = SizedMap<_PointerId, _PointerData>;
-
 type PointerObserverEntry = {
   target: Element,
-  pointerDataList: Array<_PointerData>,
+  pointerDataList: Array<PointerData>,
 };
 
 type PointerObserverCallback = (entries: Array<PointerObserverEntry>) => void;
@@ -72,10 +76,8 @@ type PointerObserverOptions = {
 type _TargetInfo = {
   controller: AbortController,
   options: PointerObserverOptions,
-  dataMap: Record<UiUtils.PointerType, _PointerDataMap>,
+  dataSet: Map<number, PointerData>,
 };
-
-const _MAX_HISTORY = 6;
 
 // ElementでもWindowでも使えるようにしようと思ったが、
 // - FirefoxはwindowにaddEventListenerで"pointer*"のリスナを登録できない（onpointer*で総入替ならできるが…）
@@ -89,9 +91,9 @@ class PointerObserver {
     "pointerdown",
     "pointerenter", // XXX windowかつmouseの場合などで発火しないので注意
     "pointerleave", // XXX windowかつmouseの場合などで発火しないので注意
-    // "pointermove", optionsによる
-    // "pointerout", // 要素に乗るたびに発火するのでwindowでlistenしても意味ない
-    // "pointerover",  // 要素に乗るたびに発火するのでwindowでlistenしても意味ない
+    "pointermove",
+    // "pointerout", // 子孫要素に乗るたびに発火するのでwindowでlistenしても意味ない
+    // "pointerover",  // 子孫要素に乗るたびに発火するのでwindowでlistenしても意味ない
     "pointerup",
   ];
 
@@ -113,22 +115,14 @@ class PointerObserver {
     this.#targetInfoMap.set(target, {
       controller,
       options,
-      dataMap: {
-        [UiUtils.PointerType.MOUSE]: new SizedMap(1),
-        [UiUtils.PointerType.PEN]: new SizedMap(1), // XXX 複数はありえないのか？
-        [UiUtils.PointerType.TOUCH]: new SizedMap(window.navigator.maxTouchPoints), // TODO primaryのointerIdが途中で変わらないならprimaryのみの場合1
-      },
+      dataSet: new Map(),
     });
     const listenerOptions = {
       passive: true,
       signal: controller.signal,
     };
 
-    const eventTypes = [ ...PointerObserver.#eventTypes ];
-    if (options.pointermove === true) {
-      eventTypes.push("pointermove");
-    }
-    eventTypes.forEach((eventType: string) => {
+    PointerObserver.#eventTypes.forEach((eventType: string) => {
       target.addEventListener(eventType, ((event: PointerEvent) => {
         this.#on(event);
       }) as EventListener, listenerOptions);
@@ -149,30 +143,32 @@ class PointerObserver {
     }
 
     const { type, pointerId, pointerType } = event;
-    const dataMap = targetInfo.dataMap[pointerType as UiUtils.PointerType];
-    let data: _PointerData;
-    if (dataMap.has(pointerId) === true) {
-      data = dataMap.get(pointerId) as _PointerData;
-      data = PointerObserver.#updateEntry(data, event);
+    const { dataSet } = targetInfo;
+    let idUsed = dataSet.has(pointerId);
+
+    let data: PointerData;
+    if (idUsed === true) {
+      data = dataSet.get(pointerId) as PointerData;
+      data = PointerObserver.#updatePointerData(data, event);
+      dataSet.delete(pointerId);
     }
     else {
-      data = PointerObserver.#createEntry(event);
+      data = PointerObserver.#createPointerData(event);
     }
+    dataSet.set(pointerId, data);
 
-    if (dataMap.has(pointerId) === true) {
-      dataMap.delete(pointerId);
-    }
-    dataMap.set(pointerId, data);
 
-    // TODO ためる
+
+
+    // TODO pointermoveの場合にまびくか否か
     this.#callback([ this.#getEntry(target) ]);
 
     if (type === "pointerleave") {
-      dataMap.delete(pointerId);
+      dataSet.delete(pointerId);
     }
   }
 
-  static #createEntry(event: PointerEvent): _PointerData {
+  static #createPointerData(event: PointerEvent): PointerData {
     let status: PointerStatus = PointerStatus.INACTIVE;
     if (event.type === "pointerdown") {
       if (event.pointerType === UiUtils.PointerType.MOUSE) {
@@ -185,23 +181,31 @@ class PointerObserver {
       }
     }
 
-    return {
-      pointerType: event.pointerType as UiUtils.PointerType,
-      pointerId: event.pointerId,
-      primary: (event.isPrimary === true),
-      status,
+    const motion = [];
+    //TODO getCoalescedEvents()がある場合追加
+
+    motion.push({
+      timeStamp: event.timeStamp,
+      eventType: event.type,
       offsetX: event.offsetX,
       offsetY: event.offsetY,
       pageX: event.pageX,
       pageY: event.pageY,
-      history: [ [ event.timeStamp, event.type ] ],
+    });
+
+    return {
+      pointerType: event.pointerType as UiUtils.PointerType,
+      pointerId: event.pointerId,
+      isPrimary: event.isPrimary,
+      status,
+      motion,
     };
   }
 
-  static #updateEntry(data: _PointerData, event: PointerEvent): _PointerData {
+  static #updatePointerData(data: PointerData, event: PointerEvent): PointerData {
     console.assert(data.pointerType === event.pointerType, "pointerType");
     console.assert(data.pointerId === event.pointerId, "pointerId");
-    console.assert(data.primary === event.isPrimary, "isPrimary");// TODO 途中でかわる？
+    console.assert(data.isPrimary === event.isPrimary, "isPrimary");// TODO 途中でかわる？
 
     let newStatus: PointerStatus | undefined = undefined;
     if (event.type === "pointerdown") {
@@ -233,22 +237,25 @@ class PointerObserver {
 
     if (newStatus) {
       data.status = newStatus;
+
+      //TODO getCoalescedEvents()がある場合追加
+      data.motion.push({
+        timeStamp: event.timeStamp,
+        eventType: event.type,
+        offsetX: event.offsetX,
+        offsetY: event.offsetY,
+        pageX: event.pageX,
+        pageY: event.pageY,
+      });
     }
-    data.offsetX = event.offsetX;
-    data.offsetY = event.offsetY;
-    data.pageX = event.pageX;
-    data.pageY = event.pageY;
-    data.history.push([ event.timeStamp, event.type ]);
-    if (data.history.length > _MAX_HISTORY) {
-      data.history.shift();
-    }
+
     return data;
   }
 
   #getEntry(target: Element): PointerObserverEntry {
     const targetInfo = this.#targetInfoMap.get(target) as _TargetInfo;
 
-    const pointerDataList: Array<_PointerData> = [];
+    const pointerDataList: Array<PointerData> = [];
     Object.values(UiUtils.PointerType).forEach((pointerType) => {
       const dataMap = targetInfo.dataMap[pointerType];
       for (const pointerData of dataMap.values()) {
