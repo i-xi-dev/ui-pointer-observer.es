@@ -12,15 +12,15 @@
         position: absolute;
         white-space: nowrap;
       }
-      *:is(*#a1, *#a2, *#a3) > *[data-pstatus="active"] {
+      *:is(*#a1, *#a2, *#a3) > *[data-pstatus="-active"] {
         background: rgba(255, 106, 0, 0.5);
         opacity: 1;
       }
-      *:is(*#a1, *#a2, *#a3) > *[data-pstatus="inactive"] {
+      *:is(*#a1, *#a2, *#a3) > *[data-pstatus="-inactive"] {
         background: rgba(191, 255, 0, 0.5);
         opacity: 1;
       }
-      *:is(*#a1, *#a2, *#a3) > *[data-pstatus="disabled"] {
+      *:is(*#a1, *#a2, *#a3) > *[data-pstatus="-disabled"] {
         background: rgba(138, 138, 138, 0.5);
         opacity: 0.6;
       }
@@ -40,7 +40,6 @@ const po = new PointerObserver((rs) => {
     const t = r.target;
     for (const pd of r.pointerDataList) {
       const tiid = `${t.id}-${pd.pointerType}-${pd.pointerId}`;
-      //console.log(`${tiid} ${pd.offsetX}, ${pd.offsetY}`);
       let ti = t.querySelector("*#" + tiid);
       if (ti) {
         //
@@ -52,12 +51,12 @@ const po = new PointerObserver((rs) => {
         ti.querySelector("*.pId").textContent = pd.pointerId;
         t.appendChild(ti);
       }
-      ti.querySelector("*.pPri").textContent = pd.primary;
+      ti.querySelector("*.pPri").textContent = pd.isPrimary;
       ti.querySelector("*.pSt").textContent = pd.status;
       ti.dataset.pstatus = pd.status;
-      ti.dataset.pprimary = pd.primary ? "true" : "false";
-      ti.style.setProperty("left", `${pd.offsetX}px`);
-      ti.style.setProperty("top", `${pd.offsetY}px`);
+      ti.dataset.pprimary = pd.isPrimary ? "true" : "false";
+      ti.style.setProperty("left", `${pd.motion.at(-1).offsetX}px`);
+      ti.style.setProperty("top", `${pd.motion.at(-1).offsetY}px`);
 
       if (ti) {
         //
@@ -70,7 +69,7 @@ const po = new PointerObserver((rs) => {
 });
 po.observe(document.getElementById("a1"));
 po.observe(document.getElementById("a2"));
-po.observe(document.getElementById("a3"), {pointermove:true});
+po.observe(document.getElementById("a3"), {precision:true,});
 console.log(po);
     </script>
   </head>
