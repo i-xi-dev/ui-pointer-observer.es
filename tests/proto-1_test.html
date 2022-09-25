@@ -32,11 +32,45 @@
       }
     </style>
     <script type="module">
-import { PointerWatcher } from "../dist/index.js";
+import { PointerObserver } from "../dist/index.js";
 
-const pw3 = new PointerWatcher(document.getElementById("a3"), {precision:true,});
+const po = new PointerObserver((rs) => {
+  for (const r of rs) {
+    console.log(JSON.stringify(r))
+    const t = r.target;
+    for (const pd of r.pointerDataList) {
+      const tiid = `${t.id}-${pd.pointerType}-${pd.pointerId}`;
+      let ti = t.querySelector("*#" + tiid);
+      if (ti) {
+        //
+      }
+      else {
+        ti = document.getElementById("p").content.firstElementChild.cloneNode(true);
+        ti.id = tiid;
+        ti.querySelector("*.pType").textContent = pd.pointerType;
+        ti.querySelector("*.pId").textContent = pd.pointerId;
+        t.appendChild(ti);
+      }
+      ti.querySelector("*.pPri").textContent = pd.isPrimary;
+      ti.querySelector("*.pSt").textContent = pd.status;
+      ti.dataset.pstatus = pd.status;
+      ti.dataset.pprimary = pd.isPrimary ? "true" : "false";
+      ti.style.setProperty("left", `${pd.motion.at(-1).offsetX}px`);
+      ti.style.setProperty("top", `${pd.motion.at(-1).offsetY}px`);
 
-
+      if (ti) {
+        //
+      }
+      else {
+        t.appendChild(ti);
+      }
+    }
+  }
+});
+po.observe(document.getElementById("a1"));
+po.observe(document.getElementById("a2"));
+po.observe(document.getElementById("a3"), {precision:true,});
+console.log(po);
     </script>
   </head>
   <body>

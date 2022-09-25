@@ -22,7 +22,7 @@ class Pointer {
   readonly #id: _PointerId;
   readonly #type: _PointerType;
   readonly #primary: boolean;
-  readonly #movements: Array<PointerMovement>;
+   #movements: Array<PointerMovement>;
   #status: PointerStatus;
   /* TODO
   buttons,
@@ -94,7 +94,7 @@ class Pointer {
     this.#updateStatus(event);
 
     // TODO dispatchEvent
-    console.log(this.toJSON());
+    console.log(JSON.stringify(this.toJSON()));
   }
 
   #addMovements(event: PointerEvent, precision?: boolean): void {
@@ -199,13 +199,14 @@ class PointerWatcher {
           if ((this.#options.untrusted !== true) && (event.isTrusted !== true)) {
             return;
           }
-      
+
           let pointer: Pointer;
           if (this.#pointers.has(event.pointerId) === true) {
             pointer = this.#pointers.get(event.pointerId) as Pointer;
           }
           else {
             pointer = new Pointer(event);
+            this.#pointers.set(event.pointerId, pointer);
             try {
               controller.enqueue(pointer);
             }

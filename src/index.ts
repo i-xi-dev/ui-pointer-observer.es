@@ -1,1 +1,1 @@
-export { PointerObserver } from "./pointer_observer";
+export { PointerWatcher } from "./pointer_watcher";
