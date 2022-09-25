@@ -17,7 +17,7 @@ type PointerEventRecord = {
   readonly offsetY: number,
   readonly pageX: number,
   readonly pageY: number,
-  readonly coalesced?: boolean, //TODO いるか？
+  readonly coalesced?: boolean, // TODO いるか？
 };
 
 type PointerData = {
