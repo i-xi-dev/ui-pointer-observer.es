@@ -4,12 +4,12 @@ import { UiUtils } from "@i-xi-dev/ui-utils";
 type _PointerId = number;
 type _PointerType = string;
 
-const PointerStatus = {
-  ACTIVE: "-active", // TODO active pointerを意味しないので紛らわしい
-  INACTIVE: "-inactive",
-  DISABLED: "-disabled",
+const _PointerStatus = {
+  IN_CONTACT: "in_contact",
+  IN_PROXIMITY: "in_proximity",
+  NONE: "none", // 交差していない or 交差しているが前面にヒット判定を持つ別の要素がある 
 } as const;
-type PointerStatus = typeof PointerStatus[keyof typeof PointerStatus];
+type _PointerStatus = typeof _PointerStatus[keyof typeof _PointerStatus];
 
 type PointerMovement = {
   readonly timeStamp: number,
@@ -18,12 +18,21 @@ type PointerMovement = {
   readonly y: number,
 };
 
-class Pointer {
+interface PointerData {
+  id: _PointerId,
+  type: _PointerType,
+  isPrimary: boolean,
+  isInProximity: boolean,
+  isInContact: boolean,
+  movements: Array<PointerMovement>,
+}
+
+class Pointer implements PointerData {
   readonly #id: _PointerId;
   readonly #type: _PointerType;
   readonly #primary: boolean;
-   #movements: Array<PointerMovement>;
-  #status: PointerStatus;
+  readonly #movements: Array<PointerMovement>;
+  #status: _PointerStatus;
   /* TODO
   buttons,
   altKey,
@@ -59,7 +68,7 @@ class Pointer {
     this.#primary = (event.isPrimary === true);
 
     this.#movements = [];
-    this.#status = PointerStatus.INACTIVE;
+    this.#status = _PointerStatus.IN_PROXIMITY;
   }
   get id(): number {
     return this.#id;
@@ -70,18 +79,22 @@ class Pointer {
   get isPrimary(): boolean {
     return this.#primary;
   }
-  get status(): PointerStatus {
-    return this.#status;
+  get isInProximity(): boolean {
+    return (this.#status === _PointerStatus.IN_CONTACT) || (this.#status === _PointerStatus.IN_PROXIMITY);
+  }
+  get isInContact(): boolean {
+    return (this.#status === _PointerStatus.IN_CONTACT);
   }
   get movements(): Array<PointerMovement> {
     return this.#movements;
   }
-  toJSON(): {id:number, type:string, primary:boolean, status:string, movements:Array<PointerMovement>} {
+  toJSON(): PointerData {
     return {
       id: this.#id,
       type: this.#type,
-      primary: this.#primary,
-      status: this.#status,
+      isPrimary: this.#primary,
+      isInProximity: this.isInProximity,
+      isInContact: this.isInContact,
       movements: [ ...this.#movements ],
     };
   }
@@ -121,28 +134,28 @@ class Pointer {
     if (event.type === "pointerdown") {
       if (this.#type === UiUtils.PointerType.MOUSE) {
         if (event.button === 0) {
-          this.#status = PointerStatus.ACTIVE;
+          this.#status = _PointerStatus.IN_CONTACT;
         }
       }
       else {
-        this.#status = PointerStatus.ACTIVE;
+        this.#status = _PointerStatus.IN_CONTACT;
       }
     }
     else if (event.type === "pointerup") {
       if (this.#type === UiUtils.PointerType.MOUSE) {
         if (event.button === 0) {
-          this.#status = PointerStatus.INACTIVE;
+          this.#status = _PointerStatus.IN_PROXIMITY;
         }
       }
       else {
-        this.#status = PointerStatus.INACTIVE;
+        this.#status = _PointerStatus.IN_PROXIMITY;
       }
     }
     else if (event.type === "pointercancel") {
-      this.#status = PointerStatus.INACTIVE;
+      this.#status = _PointerStatus.IN_PROXIMITY;
     }
     else if (event.type === "pointerleave") {
-      this.#status = PointerStatus.DISABLED;
+      this.#status = _PointerStatus.NONE;
     }
   }
 }
